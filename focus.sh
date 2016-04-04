@@ -12,8 +12,8 @@ function log_entry {
 	echo 'How productive was the session? (0-5)'
 	read PR
 	DATE=$(date +"%d/%m/%Y")
-    TIME=$(date +"%H:%M:%S")
-    DOW=$(date +"%u")
+	TIME=$(date +"%H:%M:%S")
+	DOW=$(date +"%u")
 	cat  <<- EOF >> $OF
 	$PR,$DATE,$DOW,$TIME,$ELAPSED_TIME
 	EOF
