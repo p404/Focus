@@ -2,12 +2,12 @@
 # Pablo Opazo
 # Focus, an attempt to debug myself
 
-function print_elapsed_time {
+function print_elapsed_time () {
 	ELAPSED_TIME=$( echo -ne $final_date )
 	echo -ne "Time elapsed $ELAPSED_TIME"
 }
 
-function log_entry {
+function log_entry () {
 	OF="$HOME/.focus/log.csv"
 	echo 'How productive was the session? (0-5)'
 	read PR
@@ -21,13 +21,13 @@ function log_entry {
 	echo "Exiting, Bye!"
 }
 
-function focus_bootstrap_folder {
+function focus_bootstrap_folder () {
 	if [[ ! -d "$HOME/.focus" ]]; then
 	    mkdir "$HOME/.focus"
 	fi
 }
 
-function focus_bootstrap_files {
+function focus_bootstrap_files () {
 	focus_bootstrap_folder
 
 	if [[ ! -f "$HOME/.focus/log.csv" ]];then
@@ -62,12 +62,7 @@ function host_template ()
 	fi 
 }
 
-# TODO Plotting
-#function plot_log {
-#	export width=`stty size | cut -d " " -f2`; export height=`stty size | cut -d " " -f1`-10; cat $HOME/.focus/log.csv | sed "s/ /T/" | gnuplot -e "set terminal dumb $width $height; set autoscale; set title \"Weekly productivity plot\"; set xdata time; set timefmt \"%Y-%m-%dT%H:%M:%S\"; set xlabel \"time\"; set ylabel \"productivity\"; plot '-' using 1:2 with lines"
-#}
-
-function restrict_hosts {
+function restrict_hosts () {
 	while read site
 	do
 		host_template $site
@@ -76,16 +71,55 @@ function restrict_hosts {
     cat "$HOME/.focus/restricted_hosts_file" >> /etc/hosts 
 }
 
-function exit_callback {
+function remove_site () {
+	while read site 
+	do
+		if [[ $1 = $site ]];then
+			sed -i "/$1/d" "$HOME/.focus/sites.txt" 
+		fi
+    done < "$HOME/.focus/sites.txt"
+}
+
+function add_site () {
+	# TODO Multiple arguments
+	while read site 
+	do
+		if [[ $1 = $site ]];then
+			echo "$1 is already on the blacklist" >&2
+			exit 1
+		fi
+    done < "$HOME/.focus/sites.txt" 
+    
+    echo $1 >> "$HOME/.focus/sites.txt"
+    echo "$1 added to the blacklist" 
+}
+
+function print_help () {
+	cat <<- DOC
+	Usage: focus [options]
+	    up                      Start the focus session
+	    list                    List blacklisted sites
+	    plot                    Displays a plot within the last 10 sessions
+	    -a  "www.facebook.com"  Add sites to the blacklist      
+	    -r  "www.facebook.com"  Remove sites from the blacklist
+	DOC
+}
+
+function exit_callback () {
 	cp "$HOME/.focus/clean_host_file" /etc/hosts  
 }
 
 trap 'print_elapsed_time; log_entry; exit_callback; exit 0' SIGINT SIGQUIT
 
+# TODO Plotting
+#function plot_log {
+#	export width=`stty size | cut -d " " -f2`; export height=`stty size | cut -d " " -f1`-10; cat $HOME/.focus/log.csv | sed "s/ /T/" | gnuplot -e "set terminal dumb $width $height; set autoscale; set title \"Weekly productivity plot\"; set xdata time; set timefmt \"%Y-%m-%dT%H:%M:%S\"; set xlabel \"time\"; set ylabel \"productivity\"; plot '-' using 1:2 with lines"
+#}
+
 # Entry point
 
 if [[ $EUID != 0 ]]; then
-    echo "Please run focus as root"
+    echo "Please run focus as root" >&2
     exit 1
 else
 	if [[ $1 = 'up' ]];then
@@ -103,24 +137,45 @@ else
 		    final_date="$(date -u --date @$((`date +%s` - $date1)) +%H:%M:%S)\r";
 		    echo -ne $final_date
 		done
+
+	elif [[ $1 = 'list' ]]; then
+		echo 'List of blacklisted sites:'
+		cat "$HOME/.focus/sites.txt"
+		exit 0
 		
 	elif [[ $# = 0 ]]; then
-		echo "Please input something"		
+		echo "Please input something" >&2
+		print_help
+		exit 1		
 	else
-		while getopts ":a:r:" opt; do
+		while getopts ":a:r:h" opt; do
 		  case $opt in
 		    a)
-		      echo "-a was triggered, Parameter: $OPTARG" >&2
+		      # Ugly TODO: Send an array to the function?
+			  for value in $OPTARG
+			  do
+			  		add_site $value 	 
+			  done
 		      ;;
 		    r)
-		      echo "-r was triggered, Parameter: $OPTARG" >&2
+			  # Ugly TODO: Send an array to the function?
+			  for value in $OPTARG
+			  do
+			  		remove_site $value 	 
+			  done
 		      ;;
+		     h)
+			  print_help
+			  exit 0
+			  ;;
 		    \?)
 		      echo "Invalid option: -$OPTARG" >&2
+		      print_help
 		      exit 1
 		      ;;
 		    :)
-		      echo "Option -$OPTARG requires an argument." >&2
+		      echo "Option -$OPTARG requires an argument" >&2
+		      print_help
 		      exit 1
 		      ;;
 		  esac
