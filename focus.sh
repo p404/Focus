@@ -82,15 +82,49 @@ function exit_callback {
 
 trap 'print_elapsed_time; log_entry; exit_callback; exit 0' SIGINT SIGQUIT
 
-echo 'Starting focus'
-focus_bootstrap_files
-restrict_hosts
-SUDO_USER=$(who am i | awk '{print $1}')
-sudo -u $SUDO_USER google-chrome 'https://www.brain.fm/app#!/player/35' > /dev/null
-pkill 'skype'
+# Entry point
+
+if [[ $EUID != 0 ]]; then
+    echo "Please run focus as root"
+    exit 1
+else
+	if [[ $1 = 'up' ]];then
+		echo 'Starting focus'
+		focus_bootstrap_files
+		restrict_hosts
+		SUDO_USER=$(who am i | awk '{print $1}')
+		#sudo -u $SUDO_USER google-chrome 'https://www.brain.fm/app#!/player/35' > /dev/null
+		firefox-trunk -private-window 'https://www.brain.fm/app#!/player/35' > /dev/null 2>&1 &
+		pkill 'skype'
+			
+		echo "Time on focus"
+		date1=$(date +%s) 
+		while true; do 
+		    final_date="$(date -u --date @$((`date +%s` - $date1)) +%H:%M:%S)\r";
+		    echo -ne $final_date
+		done
+		
+	elif [[ $# = 0 ]]; then
+		echo "Please input something"		
+	else
+		while getopts ":a:r:" opt; do
+		  case $opt in
+		    a)
+		      echo "-a was triggered, Parameter: $OPTARG" >&2
+		      ;;
+		    r)
+		      echo "-r was triggered, Parameter: $OPTARG" >&2
+		      ;;
+		    \?)
+		      echo "Invalid option: -$OPTARG" >&2
+		      exit 1
+		      ;;
+		    :)
+		      echo "Option -$OPTARG requires an argument." >&2
+		      exit 1
+		      ;;
+		  esac
 	
-echo "Time on focus"
-date1=`date +%s`; while true; do 
-    final_date="$(date -u --date @$((`date +%s` - $date1)) +%H:%M:%S)\r";
-    echo -ne $final_date
-done
+		done
+	fi					
+fi
